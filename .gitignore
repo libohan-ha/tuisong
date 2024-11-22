@@ -6,4 +6,7 @@ __pycache__/
 env/
 venv/
 .env
-*.db 
+*.db
+外刊.py
+github.py
+任务.py 
