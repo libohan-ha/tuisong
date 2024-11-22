@@ -87,30 +87,54 @@ def send_to_pushplus(title, content):
 
 def job_daily_push():
     """定时任务：抓取并发送外刊和GitHub内容"""
+    print(f"开始执行推送任务: {datetime.now()}")  # 添加时间戳
     try:
         # 1. 抓取并发送外刊内容
         links = fetch_links()
+        print(f"获取到的外刊链接: {links}")  # 打印获取到的链接
         china_daily_content = "今日份外刊：\n" + "\n".join(f"{i + 1}. {link}" for i, link in enumerate(links)) if links else "今日份外刊：未找到链接。"
         send_to_pushplus("今日外刊", china_daily_content)
 
         # 2. 抓取并发送GitHub内容
         decohack_item = fetch_latest_trending_decohack()
         github_item = fetch_latest_trending_github()
+        print(f"Decohack数据: {decohack_item}")  # 打印获取到的数据
+        print(f"GitHub数据: {github_item}")
         trending_content = format_trending_item(decohack_item, "Decohack")
         trending_content += format_trending_item(github_item, "GitHub")
         send_to_pushplus("GitHub Trending", trending_content)
+        print("推送任务执行完成")
         
     except Exception as e:
         print(f"推送任务执行失败: {str(e)}")
 
 # 设置定时任务
 scheduler = BackgroundScheduler()
-scheduler.add_job(job_daily_push, 'cron', hour=PUSH_HOUR, minute=PUSH_MINUTE)      # 下午3点45分发送外刊和GitHub内容
+scheduler.add_job(job_daily_push, 'cron', hour=PUSH_HOUR, minute=PUSH_MINUTE)
 scheduler.start()
+
+# 添加启动日志
+print(f"应用启动时间: {datetime.now()}")
+print(f"定时任务设置: {PUSH_HOUR}:{PUSH_MINUTE}")
+print(f"PUSHPLUS_TOKEN 是否设置: {'是' if PUSHPLUS_TOKEN else '否'}")
+
+@app.route('/test_push')
+def test_push():
+    """测试推送功能的路由"""
+    try:
+        print("手动触发推送测试")
+        job_daily_push()
+        return "推送任务已执行，请检查推送结果"
+    except Exception as e:
+        return f"推送失败: {str(e)}"
 
 @app.route('/')
 def index():
-    return "Server is running"
+    jobs = scheduler.get_jobs()
+    if jobs:
+        next_run = jobs[0].next_run_time
+        return f"Server is running. Next push scheduled at: {next_run}"
+    return "Server is running, but no jobs scheduled."
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT) 
