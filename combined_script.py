@@ -98,7 +98,7 @@ def job_daily_push():
 
 # 设置定时任务
 scheduler = BackgroundScheduler()
-scheduler.add_job(job_daily_push, 'cron', hour=23, minute=0)      # 晚上11点发送外刊和GitHub内容
+scheduler.add_job(job_daily_push, 'cron', hour=15, minute=45)      # 下午3点45分发送外刊和GitHub内容
 scheduler.start()
 
 @app.route('/')
