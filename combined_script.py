@@ -3,12 +3,9 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
-from wxauto import WeChat
-import schedule
 from flask import Flask
 from apscheduler.schedulers.background import BackgroundScheduler
 import os
-import pythoncom
 
 # Flask app setup
 app = Flask(__name__)
@@ -17,6 +14,12 @@ app = Flask(__name__)
 CHINA_DAILY_URL = 'https://www.chinadaily.com.cn/'
 DECOHACK_URL = 'https://decohack.com/category/producthunt/'
 GITHUB_TRENDING_URL = 'https://github.com/trending'
+
+# 从环境变量获取配置
+PORT = int(os.getenv('PORT', 10000))
+PUSH_HOUR = int(os.getenv('PUSH_HOUR', 15))
+PUSH_MINUTE = int(os.getenv('PUSH_MINUTE', 45))
+PUSHPLUS_TOKEN = os.getenv('PUSHPLUS_TOKEN', '')  # 从环境变量获取 pushplus 的 token
 
 def fetch_links():
     """抓取包含当前日期的链接"""
@@ -67,16 +70,20 @@ def format_trending_item(trending_item, source):
         return text
     return f"# {source} Trending\n\nNo trending items found."
 
-def send_to_wechat(content):
-    """发送内容到微信"""
+def send_to_pushplus(title, content):
+    """使用 pushplus 发送消息"""
     try:
-        pythoncom.CoInitialize()  # 初始化COM库
-        wx = WeChat()
-        wx.SendMsg(content, '文件传输助手')  # 发送到文件传输助手
+        url = "http://www.pushplus.plus/send"
+        data = {
+            "token": PUSHPLUS_TOKEN,
+            "title": title,
+            "content": content,
+            "template": "markdown"  # 使用 markdown 格式
+        }
+        response = requests.post(url, json=data)
+        print(f"推送结果: {response.text}")
     except Exception as e:
         print(f"发送消息失败: {str(e)}")
-    finally:
-        pythoncom.CoUninitialize()  # 清理COM库
 
 def job_daily_push():
     """定时任务：抓取并发送外刊和GitHub内容"""
@@ -84,21 +91,21 @@ def job_daily_push():
         # 1. 抓取并发送外刊内容
         links = fetch_links()
         china_daily_content = "今日份外刊：\n" + "\n".join(f"{i + 1}. {link}" for i, link in enumerate(links)) if links else "今日份外刊：未找到链接。"
-        send_to_wechat(china_daily_content)
+        send_to_pushplus("今日外刊", china_daily_content)
 
         # 2. 抓取并发送GitHub内容
         decohack_item = fetch_latest_trending_decohack()
         github_item = fetch_latest_trending_github()
         trending_content = format_trending_item(decohack_item, "Decohack")
         trending_content += format_trending_item(github_item, "GitHub")
-        send_to_wechat(trending_content)
+        send_to_pushplus("GitHub Trending", trending_content)
         
     except Exception as e:
         print(f"推送任务执行失败: {str(e)}")
 
 # 设置定时任务
 scheduler = BackgroundScheduler()
-scheduler.add_job(job_daily_push, 'cron', hour=15, minute=45)      # 下午3点45分发送外刊和GitHub内容
+scheduler.add_job(job_daily_push, 'cron', hour=PUSH_HOUR, minute=PUSH_MINUTE)      # 下午3点45分发送外刊和GitHub内容
 scheduler.start()
 
 @app.route('/')
@@ -106,4 +113,4 @@ def index():
     return "Server is running"
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000) 
+    app.run(host='0.0.0.0', port=PORT) 

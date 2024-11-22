@@ -1,7 +1,6 @@
 flask
 requests
 beautifulsoup4
-wxauto
 schedule
 apscheduler
-pythoncom 
+gunicorn 
